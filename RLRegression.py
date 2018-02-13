@@ -26,6 +26,7 @@ class RLRegr():
 		self.X = self._df['X']
 		self.ytest = self._df['ytest']
 		self._Xshape = self.X.shape
+		self._yshape = self.y.shape
 
 		# add bias parametr
 		self.X = np.c_[np.ones((self._Xshape[0], 1)), self.X]
@@ -36,34 +37,32 @@ class RLRegr():
 
 	def linearRegCostFunct(self, theta, X, y, lambd):
 
-		"""
-		First part count error of cost function [J of theta] vith regularization parametr
-		Second part find gradient of cost function, bias parametr (all first column of theta)\
-		 we don't regularize
-		"""
+		m = len(y)
+		hypotesis = np.dot(theta, X.T).T
+		diff = hypotesis - y
+		summ = np.sum(diff ** 2) / (2 * m)
 
-		# first part
+		l = ((lambd) / (2 * m)) * (np.sum(theta[1:]) ** 2)
+
+		err = summ + l
+		return (err)
+
+	def gradient(self, theta, X, y, lambd):
 
 		m = len(y)
 		hypotesis = np.dot(theta, X.T).T
-		diff = (hypotesis - y)
-		summ = np.sum(diff ** 2) / (2 * m)
+		diff = hypotesis - y
+		r = np.dot(diff.T, X.T)
+		grad = r / m
 
-		l = ((lambd) / (2 * m)) * (np.sum(theta[:,1]) ** 2)
-
-
-		err = summ + l
-
-		# second part find
-
-		r = np.dot(diff.T, X)
-		grad = (r / m)
-		grad[0][1:] = grad[0][1:] + ((lambd / m) * theta.T[1:])
-		return (err, grad)
+		for i in range(1, grad.shape[1]):
+			grad[:,i] += ((lambd / m) * theta[:,1])
+		return (grad[0])		
 
 	def optimize(self, X, y, theta, lambd):
 		
-		op = minimize(self.linearRegCostFunct, x0=theta, args=(X, y, lambd))
+		print(X.shape)
+		op = minimize(self.linearRegCostFunct, x0=theta, args=(X, y, lambd), method=None, jac=self.gradient, options={'maxiter':200})
 
 		return (op.x)
 
@@ -81,15 +80,13 @@ def main():
 	
 	path_data = os.getcwd() + '/ex5data1.mat'
 	rlr = RLRegr(path_data)
-	print(rlr._Xshape)
-	# print(rlr.X)
-	# print(rlr.y)
 
 	# rlr.plotData(rlr.X[:,1], rlr.y, "Change in weather level (x)", "Wather flowing out of the dam (y)")
-	theta = np.ones((1,2))
-	# theta = np.zeros((rlr._Xshape[0], 2))
-	print(rlr.linearRegCostFunct(theta, rlr.X, rlr.y, 1))
-	# print(rlr.optimize())
+	# theta = np.ones((1,2))
+	theta = np.zeros((rlr._yshape[0], 1)).reshape(1,12)
+	# print(rlr.linearRegCostFunct(theta, rlr.X, rlr.y, 1))
+	# print(rlr.gradient(theta, rlr.X, rlr.y, 1))
+	print(rlr.optimize(theta, rlr.X, rlr.y, 0))
 
 
 if __name__ == '__main__':

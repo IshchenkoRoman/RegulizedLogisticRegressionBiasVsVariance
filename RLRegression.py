@@ -82,7 +82,6 @@ class RLRegr():
 
 	def optimize(self, theta, X, y, lambd):
 		
-		print(theta.shape)
 		op = minimize(self.linearRegCostFunct, x0=theta, args=(X, y, lambd), method=None, jac=self.gradient, options={'maxiter':200})
 
 		return (op)
@@ -115,22 +114,61 @@ class RLRegr():
 		plt.tight_layout()
 		plt.show()
 
+	def learningCurve(self, X, y, Xval, yval, lambd):
+
+		pass
+
+	def learningCurves(self, X, y, Xval, yval, lambd):
+
+		m = y.size
+
+		validateX = np.c_[np.ones((Xval.shape[0], 1)), Xval]
+		validatey = yval
+
+		array_of_train_error = []
+		array_of_validate_error = []
+		theta_opt = np.array([[15], [15]])
+		# optimize = self.optimize(theta_opt, X[:1], y[:1], lambd)
+		# array_of_train_error.append(self.linearRegCostFunct(optimize.x, X[:1], y[:1], 0))
+		# array_of_validate_error.append(self.linearRegCostFunct(optimize.x, validateX, validatey, 0))
+		for i in range(0, m):
+			optimize = self.optimize(theta_opt, X[:i+1], y[:i+1], lambd)
+			# print(optimize)
+			array_of_train_error.append(self.linearRegCostFunct(optimize.x, X[:i+1], y[:i+1], 0))
+			array_of_validate_error.append(self.linearRegCostFunct(optimize.x, validateX, validatey, 0))
+
+		return (array_of_train_error, array_of_validate_error)
+
+	def plotCurvesHightBias(self, err_train, err_val):
+
+		number_of_training = np.arange(1, 13)
+
+		fig, ax = plt.subplots()
+
+		plt.plot(number_of_training, err_train)
+		plt.plot(number_of_training, err_val)
+		# plt.set_xlim(0, 9000)
+		# plt.set_ylim(0, 12)
+		plt.show()
+
 def main():
 	
 	path_data = os.getcwd() + '/ex5data1.mat'
 	rlr = RLRegr(path_data)
 
-	# rlr.plotData(rlr.X[:,1], rlr.y, "Change in weather level (x)", "Wather flowing out of the dam (y)")
-	theta = np.array([[15],[15]])
-	# theta = np.zeros((rlr._yshape[0], 1)).reshape(1,12)
-	# print(rlr.linearRegCostFunct(theta, rlr.X, rlr.y, 1))
-	# print(rlr.gradient(theta, rlr.X, rlr.y, 1))
-	op = rlr.optimize(theta, rlr.X, rlr.y, 0)
-	xx = op.x
-	print(op.x)
-	print(rlr.X)
-	# print(op.x.shape, rlr.X.shape)
-	rlr.plotData(rlr.X[:,1], rlr.y, "Change in weather level (x)", "Wather flowing out of the dam (y)", label='Scipy optimize', option=2, line_x=np.linspace(-50, 40), line_y=(op.x[0] + (op.x[1] * np.linspace(-50, 40))))
+	# # rlr.plotData(rlr.X[:,1], rlr.y, "Change in weather level (x)", "Wather flowing out of the dam (y)")
+
+	# theta = np.array([[15],[15]])
+
+	# # print(rlr.linearRegCostFunct(theta, rlr.X, rlr.y, 1))
+	# # print(rlr.gradient(theta, rlr.X, rlr.y, 1))
+
+	# op = rlr.optimize(theta, rlr.X, rlr.y, 0)
+	# rlr.plotData(rlr.X[:,1], rlr.y, "Change in weather level (x)", "Wather flowing out of the dam (y)", label='Scipy optimize', option=2, line_x=np.linspace(-50, 40), line_y=(op.x[0] + (op.x[1] * np.linspace(-50, 40))))
+
+	err_train, err_val = rlr.learningCurves(rlr.X, rlr.y, rlr.Xval, rlr.yval, 100000000)
+	rlr.plotCurvesHightBias(err_train, err_val)
+
 
 if __name__ == '__main__':
 	main()

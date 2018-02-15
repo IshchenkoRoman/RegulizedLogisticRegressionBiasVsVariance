@@ -30,6 +30,7 @@ class RLRegr():
 		self.ytest = self._df['ytest']
 		self._Xshape = self.X.shape
 		self._yshape = self.y.shape
+		self.polyX = None
 
 		# add bias parametr
 		self.X = np.c_[np.ones((self._Xshape[0], 1)), self.X]
@@ -46,7 +47,7 @@ class RLRegr():
 	# 	grad = (1 / m) * (X.T.dot(h-y)) + (lambd/m)*np.r_[[[0]], theta[1:].reshape(-1, 1)]
 	# 	return (grad.flatten())
 
-	def gradient(self, theta, X, y, lambd):
+	def myGradient(self, theta, X, y, lambd):
 
 		m = len(y)
 		# Here was problem just add reshape instead ".T"
@@ -61,7 +62,7 @@ class RLRegr():
 			grad[:,i] = grad[:,i] + t
 		return (grad.flatten())
 
-	def linearRegCostFunct(self, theta, X, y, lambd):
+	def myLinearRegCostFunct(self, theta, X, y, lambd):
 
 		m = len(y)
 		hypotesis = np.dot(theta, X.T).T
@@ -73,6 +74,27 @@ class RLRegr():
 		err = summ + l
 		return (err)
 
+	def linearRegCostFunct(self, theta, X, y, lambd, return_grad=False):
+
+		m = len(y)
+
+		theta = np.reshape(theta, (-1, y.shape[1]))
+
+		J = 0
+		grad = np.zeros(theta.shape)
+
+		J = (1./(2*m)) * np.power((np.dot(X, theta) - y), 2).sum() + (float(lambd) / (2*m)) * np.power(theta[1:theta.shape[0]], 2).sum()
+
+		grad = (1./m) * np.dot(X.T, np.dot(X, theta) - y) + (float(lambd) / m)*theta
+
+		grad_no_regularization = (1./m) * np.dot(X.T, np.dot(X, theta) - y)
+		grad[0] = grad_no_regularization[0]
+
+		if return_grad == True:
+			return J, grad.flatten()
+		else:
+			return J
+
 	# def linearRegCostFunct(self, theta, X, y, lambd):
 
 	# 	m = y.size
@@ -80,10 +102,16 @@ class RLRegr():
 	# 	cost = (1 / (2 * m)) * np.sum(np.square(h-y)) + (lambd / (2 * m)) * np.sum(np.square(theta[1:]))
 	# 	reurn (cost)		
 
-	def optimize(self, theta, X, y, lambd):
-		
-		op = minimize(self.linearRegCostFunct, x0=theta, args=(X, y, lambd), method=None, jac=self.gradient, options={'maxiter':200})
+	def optimizeWithMyGradient(self, theta1, X, y, lambd):
 
+		theta = np.zeros((X.shape[1], 1))
+		op = minimize(self.myLinearRegCostFunct, x0=theta, args=(X, y, lambd), method=None, jac=self.myGradient, options={'maxiter':200})
+		return (op)
+
+	def optimizeWithLBFGSB(self, theta, X, y, lambd):
+		
+		theta = np.zeros((X.shape[1], 1))
+		op = minimize(self.linearRegCostFunct, x0=theta, args=(X, y, lambd, True), method='L-BFGS-B', jac=True, options={'disp':True, 'maxiter':200})
 		return (op)
 
 	def scikitOptimize(self, X, y):
@@ -103,7 +131,7 @@ class RLRegr():
 		axs[0, 0].set_xlabel(xlabel)
 		axs[0, 0].set_ylabel(ylabel)
 		axs[0, 0].grid(True)
-		if (option == 2):
+		if (option == 2 and line_x != None and line_y != None):
 			axs[1, 0].scatter(X, y, marker='x', c='r')
 			axs[1, 0].plot(line_x, line_y)
 			axs[1, 0].set_xlim(-50, 60)
@@ -114,60 +142,154 @@ class RLRegr():
 		plt.tight_layout()
 		plt.show()
 
-	def learningCurve(self, X, y, Xval, yval, lambd):
-
-		pass
-
 	def learningCurves(self, X, y, Xval, yval, lambd):
 
 		m = y.size
 
-		validateX = np.c_[np.ones((Xval.shape[0], 1)), Xval]
+		validateX = Xval
 		validatey = yval
 
 		array_of_train_error = []
 		array_of_validate_error = []
-		theta_opt = np.array([[15], [15]])
-		# optimize = self.optimize(theta_opt, X[:1], y[:1], lambd)
-		# array_of_train_error.append(self.linearRegCostFunct(optimize.x, X[:1], y[:1], 0))
-		# array_of_validate_error.append(self.linearRegCostFunct(optimize.x, validateX, validatey, 0))
+		theta_opt = np.zeros((X.shape[1], 1))
 		for i in range(0, m):
-			optimize = self.optimize(theta_opt, X[:i+1], y[:i+1], lambd)
+			optimize = self.optimizeWithLBFGSB(theta_opt, X[:i+1], y[:i+1], lambd)
 			# print(optimize)
 			array_of_train_error.append(self.linearRegCostFunct(optimize.x, X[:i+1], y[:i+1], 0))
 			array_of_validate_error.append(self.linearRegCostFunct(optimize.x, validateX, validatey, 0))
 
 		return (array_of_train_error, array_of_validate_error)
 
-	def plotCurvesHightBias(self, err_train, err_val):
+	def plotCurvesHighBias(self, err_train, err_val):
 
 		number_of_training = np.arange(1, 13)
 
-		fig, ax = plt.subplots()
+		et = plt.plot(number_of_training, err_train)
+		ev = plt.plot(number_of_training, err_val)
+		plt.xlim(0, 12)
+		plt.ylim(0, max(err_val) + max(err_val) % 10)
+		plt.xlabel("Number of training examples")
+		plt.ylabel("Error")
+		plt.legend([et[0], ev[0]], ["Train", "Cross Validation"])
 
-		plt.plot(number_of_training, err_train)
-		plt.plot(number_of_training, err_val)
-		# plt.set_xlim(0, 9000)
-		# plt.set_ylim(0, 12)
 		plt.show()
+
+	def createPolynomX(self, power, Xtrain):
+
+		# poly = PolynomialFeatures(degree=power)
+		X_res = np.ones((Xtrain.shape[0], power))
+		y, x = X_res.shape
+
+		for i in range(y):
+			for j in range(x):
+				X_res[i][j] = Xtrain[i] ** (j + 1)
+
+		return (X_res)
+
+	def featureNormilize(self, polyX):
+
+		mu = np.mean(polyX, axis=0)
+		X_norm = polyX - mu
+
+		sigma = np.std(X_norm, axis=0)
+		X_norm = X_norm/sigma
+
+		return (X_norm, mu, sigma)
+
+	def _plotFit(self, min_x, max_x, mu, sigma, theta, p, left=15, right=25):
+		
+		print(min_x)
+		x = np.array(np.arange(min_x - left, max_x + right, 0.05))
+
+		polynom = self.createPolynomX(p, x)
+		polynom = (polynom - mu) / sigma
+		polynom = np.c_[np.ones((polynom.shape[0], 1)), polynom]
+
+		# print(theta.shape, polynom.shape)
+		pol = plt.plot(x, np.dot(polynom, theta), '-', linewidth=2)
+		return (pol)
+
+	def plotPolyReg(self, polyX, y, mu, sigma, p, lambd=1):
+
+		init_theta = np.zeros((polyX.shape[1], 1))
+		theta = self.optimizeWithLBFGSB(init_theta, polyX, y, lambd)
+
+		data = plt.plot(self.X[:,1], y, 'rx', markersize=7, mew=2)
+		pol = self._plotFit(min(self.X[:,1]), max(self.X[:,1]), mu, sigma, theta.x, p)
+		plt.xlim(-80, 60)
+		plt.ylim(-50, 300)
+		plt.xlabel("Change in water level (x)", fontsize=10)
+		plt.ylabel("Water flowing out of the dam (y)", fontsize=10)
+		plt.legend([data[0], pol[0]], ["Our data", "Polynomial curve of {0} degree".format(p)])
+		plt.title("Polynomial Regression Fit (lambda = {:f})".format(lambd), fontsize=10)
+
+		plt.show()
+
+	def plotPolyLearningCurves(self, Xpoly, y, Xval, yval, lambd):
+
+		plt.close()
+		m = y.size
+		print(Xpoly.shape, y.shape)
+		print(Xval.shape, yval.shape)
+		plt.figure(figsize=(12,8))
+
+		err_train, err_val =self.learningCurves(Xpoly, y, Xval, yval, lambd)
+
+		p1, p2 = plt.plot(range(1, m+1), err_train, range(1, m+1), err_val, linewidth=2)
+
+		plt.show()
+
 
 def main():
 	
 	path_data = os.getcwd() + '/ex5data1.mat'
 	rlr = RLRegr(path_data)
 
+	"""
+	First part of task
+	"""
+
+	# Draw our data of trining set
 	# # rlr.plotData(rlr.X[:,1], rlr.y, "Change in weather level (x)", "Wather flowing out of the dam (y)")
 
-	# theta = np.array([[15],[15]])
+	# theta = np.zeros((rlr.X.shape[1], 1))
 
-	# # print(rlr.linearRegCostFunct(theta, rlr.X, rlr.y, 1))
-	# # print(rlr.gradient(theta, rlr.X, rlr.y, 1))
+	# print(rlr.linearRegCostFunct(theta, rlr.X, rlr.y, 1))
+	# # # print(rlr.gradient(theta, rlr.X, rlr.y, 1))
 
-	# op = rlr.optimize(theta, rlr.X, rlr.y, 0)
-	# rlr.plotData(rlr.X[:,1], rlr.y, "Change in weather level (x)", "Wather flowing out of the dam (y)", label='Scipy optimize', option=2, line_x=np.linspace(-50, 40), line_y=(op.x[0] + (op.x[1] * np.linspace(-50, 40))))
+	# # Train theta
+	# op = rlr.optimizeWithLBFGSB(theta, rlr.X, rlr.y, 0)
+	# # print(op)
+	# # rlr.plotData(rlr.X[:,1], rlr.y, "Change in weather level (x)", "Wather flowing out of the dam (y)", label='Scipy optimize', option=2, line_x=np.linspace(-50, 40), line_y=(op.x[0] + (op.x[1] * np.linspace(-50, 40))))
 
-	err_train, err_val = rlr.learningCurves(rlr.X, rlr.y, rlr.Xval, rlr.yval, 100000000)
-	rlr.plotCurvesHightBias(err_train, err_val)
+	# # In Learning curves we make subsets of our training data and calculate errors and train theta for this subsets and then with that thetas cfalculate error whole Validate set
+	# Xval = np.c_[np.ones((rlr.Xval.shape[0], 1)), rlr.Xval]
+	# err_train, err_val = rlr.learningCurves(rlr.X, rlr.y, Xval, rlr.yval, 1)
+	# # Plot dependence between size of subset and errors of train sbuset and validate set
+	# rlr.plotCurvesHighBias(err_train, err_val)
+
+	"""
+	Second part, polynomial regression
+	"""
+
+	# So, we create our polynomial features, that can improve accurancy of prediction
+
+	p = 8
+	polynom = rlr.createPolynomX(p, rlr.X[:,1])
+
+	polynom, mu, sigma = rlr.featureNormilize(polynom)
+	polynom = np.c_[np.ones((polynom.shape[0], 1)), polynom]
+
+	polynom_test = rlr.createPolynomX(p, rlr.Xtest)
+	polynom_test = (polynom_test - mu) / sigma
+	polynom_test = np.c_[np.ones((polynom_test.shape[0], 1)), polynom_test]
+
+	polynom_val = rlr.createPolynomX(p, rlr.Xval)
+	polynom_val = (polynom_val - mu) / sigma
+	polynom_val = np.c_[np.ones((polynom_val.shape[0], 1)), polynom_val]
+
+	# rlr.plotPolyReg(polynom, rlr.y, mu, sigma, p, 0)
+	rlr.plotPolyLearningCurves(polynom, rlr.y, polynom_val, rlr.yval, 0)
 
 
 if __name__ == '__main__':

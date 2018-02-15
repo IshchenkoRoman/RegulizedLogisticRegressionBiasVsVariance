@@ -81,12 +81,12 @@ class RLRegr():
 		theta = np.reshape(theta, (-1, y.shape[1]))
 
 		J = 0
-		grad = np.zeros(theta.shape)
 
 		J = (1./(2*m)) * np.power((np.dot(X, theta) - y), 2).sum() + (float(lambd) / (2*m)) * np.power(theta[1:theta.shape[0]], 2).sum()
 
 		if return_grad == True:
 
+			grad = np.zeros(theta.shape)
 			grad = (1./m) * np.dot(X.T, np.dot(X, theta) - y) + (float(lambd) / m)*theta
 			grad_no_regularization = (1./m) * np.dot(X.T, np.dot(X, theta) - y)
 			grad[0] = grad_no_regularization[0]
@@ -131,7 +131,7 @@ class RLRegr():
 		axs[0, 0].set_xlabel(xlabel)
 		axs[0, 0].set_ylabel(ylabel)
 		axs[0, 0].grid(True)
-		if (option == 2 and line_x != None and line_y != None):
+		if (option == 2):
 			axs[1, 0].scatter(X, y, marker='x', c='r')
 			axs[1, 0].plot(line_x, line_y)
 			axs[1, 0].set_xlim(-50, 60)
@@ -287,6 +287,61 @@ class RLRegr():
 		for i in range(len(lambdas_vec)):
 			print("  {:f}\t{:f}\t{:f}\n".format(lambdas_vec[i], err_train[i], err_val[i]))
 
+	def plotLearningCurvesRandomEx(self, X, y, X_val, yval, lambd=1, times=50):
+
+		m = len(y)
+		err_train_rand = np.zeros((m, times))
+		err_val_rand = np.zeros((m, times))
+
+		for i in range(1, m+1):
+
+			for j in range(times):
+
+				# choose i random training example
+
+				rand_sample_train = np.random.permutation(X.shape[0])
+				rand_sample_train = rand_sample_train[:i]
+
+				# choose i random  validation example
+
+				rand_sample_val= np.random.permutation(X_val.shape[0])
+				rand_sample_val = rand_sample_train[:i]
+
+				# define trainig adnnd validation sets for this loop
+
+				X_poly_train_rand = X[rand_sample_train,:]
+				y_train_rand = y[rand_sample_train]
+				X_poly_val_rand = X_val[rand_sample_val,:]
+				y_val_rand = yval[rand_sample_val]
+
+
+				theta = self.optimizeWithLBFGSB(X_poly_train_rand, y_train_rand, lambd)
+
+				err_train_rand[i-1,j] = self.linearRegCostFunct(theta.x, X_poly_train_rand, y_train_rand, 0)
+				err_val_rand[i-1,j] = self.linearRegCostFunct(theta.x, X_poly_val_rand, y_val_rand, 0)
+
+		err_train = np.mean(err_train_rand, axis=1)
+		err_val = np.mean(err_val_rand, axis=1)
+
+		p1, p2 = plt.plot(range(m), err_train, range(m), err_val, linewidth=2)
+
+		plt.axis([0, 13, 0, 100])
+		legend = plt.legend((p1, p2), ("Traine", "Validation"), fontsize=10)
+		for label in legend.get_lines():
+			label.set_linewidth(3)
+
+		plt.title("Polynomial Regression Learning Curve (lambda = {:f})".format(lambd), fontsize=10)
+		plt.xlabel("Number of training examples", fontsize=10)
+		plt.ylabel("Error")
+
+		plt.show()
+
+		print("Polynomial Regression (lambda = {:f})\n\n".format(lambd))
+		print("# Training Examples\tTrain Error\tValidation Error\n")
+		for i in range(m):
+			print("  \t{:d}\t\t{:f}\t{:f}\n".format(i+1, float(err_train[i]), float(err_val[i])))
+
+
 
 
 
@@ -308,15 +363,15 @@ def main():
 	# # # print(rlr.gradient(theta, rlr.X, rlr.y, 1))
 
 	# # Train theta
-	# op = rlr.optimizeWithLBFGSB(theta, rlr.X, rlr.y, 0)
-	# # print(op)
-	# # rlr.plotData(rlr.X[:,1], rlr.y, "Change in weather level (x)", "Wather flowing out of the dam (y)", label='Scipy optimize', option=2, line_x=np.linspace(-50, 40), line_y=(op.x[0] + (op.x[1] * np.linspace(-50, 40))))
+	op = rlr.optimizeWithLBFGSB(rlr.X, rlr.y, 0)
+	# print(op)
+	rlr.plotData(rlr.X[:,1], rlr.y, "Change in weather level (x)", "Wather flowing out of the dam (y)", label='Scipy optimize', option=2, line_x=np.linspace(-50, 40), line_y=(op.x[0] + (op.x[1] * np.linspace(-50, 40))))
 
 	# # In Learning curves we make subsets of our training data and calculate errors and train theta for this subsets and then with that thetas cfalculate error whole Validate set
-	# Xval = np.c_[np.ones((rlr.Xval.shape[0], 1)), rlr.Xval]
-	# err_train, err_val = rlr.learningCurves(rlr.X, rlr.y, Xval, rlr.yval, 1)
-	# # Plot dependence between size of subset and errors of train sbuset and validate set
-	# rlr.plotCurvesHighBias(err_train, err_val)
+	Xval = np.c_[np.ones((rlr.Xval.shape[0], 1)), rlr.Xval]
+	err_train, err_val = rlr.learningCurves(rlr.X, rlr.y, Xval, rlr.yval, 1)
+	# Plot dependence between size of subset and errors of train sbuset and validate set
+	rlr.plotCurvesHighBias(err_train, err_val)
 
 	"""
 	Second part, polynomial regression
@@ -340,18 +395,18 @@ def main():
 
 	# Here and below we can see how lambda is influence on accurancy of prediction
 
-	# rlr.plotPolyReg(polynom, rlr.y, mu, sigma, p, 0)
-	# rlr.plotPolyLearningCurves(polynom, rlr.y, polynom_val, rlr.yval, 0)
+	rlr.plotPolyReg(polynom, rlr.y, mu, sigma, p, 0)
+	rlr.plotPolyLearningCurves(polynom, rlr.y, polynom_val, rlr.yval, 0)
 
-	# rlr.plotPolyReg(polynom, rlr.y, mu, sigma, p, 1)
-	# rlr.plotPolyLearningCurves(polynom, rlr.y, polynom_val, rlr.yval, 1)
+	rlr.plotPolyReg(polynom, rlr.y, mu, sigma, p, 1)
+	rlr.plotPolyLearningCurves(polynom, rlr.y, polynom_val, rlr.yval, 1)
 
-	# rlr.plotPolyReg(polynom, rlr.y, mu, sigma, p, 100)
-	# rlr.plotPolyLearningCurves(polynom, rlr.y, polynom_val, rlr.yval, 100)
+	rlr.plotPolyReg(polynom, rlr.y, mu, sigma, p, 100)
+	rlr.plotPolyLearningCurves(polynom, rlr.y, polynom_val, rlr.yval, 100)
 
 	# Plot different lambdas and print errors of lambdas, to understand which one is the best solution for our task
 
-	# rlr.plotDifferentLambdasError(polynom, rlr.y, polynom_val, rlr.yval)
+	rlr.plotDifferentLambdasError(polynom, rlr.y, polynom_val, rlr.yval)
 
 	"""
 
@@ -386,6 +441,9 @@ def main():
 
 	err = rlr.linearRegCostFunct(theta.x, polynom_test, rlr.ytest, 0)
 	print(err)
+
+	rlr.plotLearningCurvesRandomEx(polynom, rlr.y, polynom_val, rlr.yval, lambd=0.01, times=50)
+	rlr.plotLearningCurvesRandomEx(polynom, rlr.y, polynom_val, rlr.yval, lambd=3, times=50)
 
 
 
